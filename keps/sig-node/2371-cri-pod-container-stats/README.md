@@ -539,6 +539,9 @@ As a requirement for the Beta stage, cAdvisor must support optionally collecting
 - CRI should be extended to provide required stats for `/stats/summary`
 - Kubelet should be extended to provide the required stats from CRI implementation for `/stats/summary`.
 - This new behavior will be gated by a feature gate to prevent regressions for users that rely on the old behavior.
+- cAdvisor should be able to optionally not report the metrics needed for both summary API and `/metrics/cadvisor`. This behavior will be toggled by the Kubelet feature gate.
+- Kubelet will query the CRI implementation for endpoints to broadcast from its own server.
+	- This will allow the CRI to broadcast `/metrics/cadvisor` through the Kubelet's HTTP server.
 
 #### Alpha -> Beta Graduation
 
@@ -547,9 +550,6 @@ As a requirement for the Beta stage, cAdvisor must support optionally collecting
 - Validate performance impact of this feature is within allowable margin (or non-existent, ideally).
 	- The CRI stats implementation should perform better than they did with CRI+cAdvisor.
 - cAdvisor stats provider may be marked as deprecated (depending on stability of new CRI based implementations).
-- cAdvisor should be able to optionally not report the metrics needed for both summary API and `/metrics/cadvisor`. This behavior will be toggled by the Kubelet feature gate.
-- Kubelet will query the CRI implementation for endpoints to broadcast from its own server.
-	- This will allow the CRI to broadcast `/metrics/cadvisor` through the Kubelet's HTTP server.
 
 #### Beta -> GA Graduation
 
@@ -795,7 +795,7 @@ _This section must be completed when targeting beta graduation to a release._
 2021-12-07: KEP successfully implemented at Alpha in 1.23
 2022-01-25: KEP targeted at Beta in 1.24
 2022-04-20: KEP deemed not ready for Beta in 1.24
-2022-06-07: KEP targeted at Beta in 1.25
+2022-06-13: Move some Beta criteria to Alpha criteria in 1.25
 
 ## Drawbacks
 
