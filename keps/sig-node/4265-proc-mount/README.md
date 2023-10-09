@@ -169,6 +169,13 @@ How will UX be reviewed, and by whom?
 Consider including folks who also work outside the SIG or subproject.
 -->
 
+- A user turning this on without user namespaces enabled
+    - PSA will enforce that privileged users can do this, who hopefully know what they're doing.
+    - An admission webhook could be defined by a cluster admin to require pods request hostUsers=false
+      when ProcMount is Unmasked
+- More trust in user namespacing/the kernel instead of container runtime
+    - This is probably the correct direction to head in.
+
 ## Design Details
 
 ### Test Plan
@@ -278,10 +285,11 @@ in back-to-back releases.
 
 - Feature implemented behind a feature flag
 - Add e2e tests for the feature (must be done before beta)
+- Investigate updates to PSS policies in conjunction with user namespaces
 
 #### Beta
 
-- Investigate updates to PSS policies in conjunction with user namespaces
+- Stabalize, and sync Beta with [User Namespace](https://github.com/kubernetes/enhancements/issues/127) support
 
 #### GA
 
@@ -317,7 +325,10 @@ enhancement:
 - Will any other components on the node change? For example, changes to CSI,
   CRI or CNI may require updating that component before the kubelet.
 -->
-It has been in support by kube-apiserver and kubelet since 1.12, so version skew is no longer a worry.
+
+The feature gate is only processed by the API server--Kubelet has no awareness of it. API server will scrub the ProcMount field from the request
+if it doesn't support the feature gate. Since all supported Kubelet versions support ProcMountType field, there's no version skew worry.
+API server can have the feature gate toggled without worrying about doing the same for Kubelets.
 
 ## Production Readiness Review Questionnaire
 
@@ -335,11 +346,11 @@ No, only allows a user to access the Unmasked ProcMountType
 
 ###### Can the feature be disabled once it has been enabled (i.e. can we roll back the enablement)?
 
-Yes
+Yes, though a reboot or drain will be necessary to limit any containers that originally got access to Unmasked ProcMountType.
 
 ###### What happens if we reenable the feature if it was previously rolled back?
 
-Nothing unexpected.
+The API server will need to recreate the pods that had the request scrubbed of the ProcMountType field (so the original intent can be fulfilled).
 
 ###### Are there any tests for feature enablement/disablement?
 
@@ -480,5 +491,7 @@ Major milestones might include:
 - `--oci-worker-no-process-sandbox` like in [BuildKit](https://github.com/moby/buildkit/blob/v0.12.2/examples/kubernetes/job.rootless.yaml#L31)
     - Not broadly supported with other container runtimes/builders. 
 - Update the kernel to allow mounting a new procfs with masks.
+    - Proposed, but [denied](https://patchwork.kernel.org/project/linux-fsdevel/patch/20180404115311.725-1-alban@kinvolk.io/) in the kernel
+- Adopt a similar approach to LXD where `/proc` and `/sys` are mounted to different locations within the container, instead of masked.
 
 ## Infrastructure Needed (Optional)
