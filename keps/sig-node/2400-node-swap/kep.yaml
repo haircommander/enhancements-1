@@ -22,7 +22,7 @@ approvers:
   - "@dchen1107"
 
 # The target maturity stage in the current dev cycle for this KEP.
-stage: stable
+stage: beta
 
 # The most recent milestone for which work toward delivery of this KEP has been
 # done. This can be the current (upcoming) milestone, if it is being actively
@@ -33,7 +33,7 @@ latest-milestone: "v1.32"
 milestone:
   alpha: "v1.22"
   beta: "v1.30"
-  stable: "v1.32"
+  stable: ""
 
 # The following PRR answers are required at alpha release
 # List the feature gate name and the components for which it must be enabled

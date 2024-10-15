@@ -10,6 +10,7 @@
 - [Proposal](#proposal)
   - [Enable Swap Support only for Burstable QoS Pods](#enable-swap-support-only-for-burstable-qos-pods)
     - [Set Aside Swap for System Critical Daemons](#set-aside-swap-for-system-critical-daemons)
+    - [Swap Aware Eviction Manager](#swap-aware-eviction-manager)
     - [Best Practices](#best-practices)
       - [Disable swap for system critical daemons](#disable-swap-for-system-critical-daemons)
       - [Protect system critical daemons for iolatency](#protect-system-critical-daemons-for-iolatency)
@@ -26,13 +27,13 @@
     - [Low footprint systems](#low-footprint-systems)
     - [Virtualization management overhead](#virtualization-management-overhead)
   - [Notes/Constraints/Caveats (Optional)](#notesconstraintscaveats-optional)
+  - [Future Extensions of Swap](#future-extensions-of-swap)
   - [Risks and Mitigations](#risks-and-mitigations)
     - [Existing use cases of Swap](#existing-use-cases-of-swap)
     - [Exhausting swap resource](#exhausting-swap-resource)
     - [Security risk](#security-risk)
     - [Cgroupv1 support](#cgroupv1-support)
     - [Memory-backed volumes](#memory-backed-volumes)
-    - [Evictions](#evictions)
       - [Brief technical overview of swap and evictions](#brief-technical-overview-of-swap-and-evictions)
       - [Current eviction limitations](#current-eviction-limitations)
       - [Advanced best-practices for manually setting memory evictions](#advanced-best-practices-for-manually-setting-memory-evictions)
@@ -171,6 +172,7 @@ will be necessary to implement the third scenario.
 - Cluster administrators can enable and configure kubelet swap utilization on a
   per-node basis.
 - Use of swap memory for cgroupsv2.
+- Basic swap aware eviction manager
 
 ### Non-Goals
 
@@ -227,6 +229,12 @@ Since this proposal advocates enabling swap only for the Burstable QoS pods, thi
 memory.swap.max = total swap memory available on the system - system reserve (memory)
 
 This is the total amount of swap available for all the Burstable QoS pods; let's call it `TotalPodsSwapAvailable`. This will ensure that the system critical daemons will have access to the swap at least equal to the system reserved memory. This will indirectly act as having support for swap in system reserved.
+
+#### Swap Aware Eviction Manager
+
+While progressing this feature to stable, we found a major gap in this feature. The eviction manager must protect the node from saturation of swap memory. If a node exhausts swap memory, this can take down the node. In some customer cases, OOMKiller could step in to save the node but this should not be the default option.
+
+Due to this, we want to enhance the eviction manager to be aware of swap. The eviction manager must step in when the node becoming unstable and start evicting pods that are swapping first.
 
 #### Best Practices
 
@@ -413,6 +421,19 @@ to not permit the use of swap by setting `memory-swap` equal to `limit`.
 
 [runtime specification]: https://github.com/opencontainers/runtime-spec/blob/1c3f411f041711bbeecf35ff7e93461ea6789220/config-linux.md#memory
 
+### Future Extensions of Swap
+
+This feature was created so that we iterate on adding swap to Kubernetes. Due to this, workload swap was out of scope for the original implementation.
+As this KEP moves towards stability, there is a need to comment on areas that were dropped from support in this KEP.
+To make swap more useful for workloads, we acknowledge the need for proper APIs for swap.
+
+- Swap should be opt-in and opt-out at the workload level.
+- Workloads can request their own limits for `memory.swap.max`.
+- Eviction Manager should be tunability in regards to swap limits.
+- Eviction Manager should look at more advanced ways of determining swap pressure.
+
+New functionality must not break this KEP so we think the best approach would be to implement a new Swap
+
 ### Risks and Mitigations
 
 Having swap available on a system reduces predictability. Swap's performance is
@@ -458,6 +479,9 @@ This can cause problems where workloads can use up all swap.
 If all swap is used up on a node, it can make the node go unhealthy.
 To avoid exhausting swap on a node, `UnlimitedSwap` was dropped from the API in beta2.
 
+It was determined that the eviction manager should still be able to protect the node in case of swap memory pressure.
+In this case, we will teach the eviction manager to be aware of swap as a resource to avoid exhausting swap resource.
+
 #### Security risk
 
 Enabling swap on a system without encryption poses a security risk, as critical information, such as Kubernetes secrets, may be swapped out to the disk. If an unauthorized individual gains access to the disk, they could potentially obtain these secrets. To mitigate this risk, it is recommended to use encrypted swap. However, handling encrypted swap is not within the scope of kubelet; rather, it is a general OS configuration concern and should be addressed at that level. Nevertheless, it is essential to provide documentation that warns users of this potential issue, ensuring they are aware of the potential security implications and can take appropriate steps to safeguard their system.
@@ -490,12 +514,6 @@ Linux distributions can decide to backport this options to older versions of the
 
 In the longer term, when this option would be very widely supported, this would no longer be a concern, hence this logic
 could be dropped.
-
-#### Evictions
-
-Since this KEP aims to revolve around basic swap enablement and leave more advanced features to
-follow-up KEPs, swap-based evictions are out-of-scope for this KEP
-(see the [summary](#summary) section above for more info).
 
 ##### Brief technical overview of swap and evictions
 
@@ -936,6 +954,8 @@ Here are specific improvements to be made:
 - Add e2e test confirming that `NoSwap` will actually not swap
 - Add e2e test confirming that swap is used for `LimitedSwap`.
 - Document [best practices](#best-practices) for setting up Kubernetes with swap
+- Enhance beta docs to provide more information about swap.
+- Make the eviction manager swap aware.
 
 [via cgroups]: #restrict-swap-usage-at-the-cgroup-level
 
@@ -1442,6 +1462,7 @@ This is a partial list of everything that was done, but contains the most signif
 - **2024-05-23:** Mount tmpfs memory-backed volumes with a noswap option if supported [#124060](https://github.com/kubernetes/kubernetes/pull/124060).
 - **2024-07-22:** Restrict access to swap for containers in high priority Pods [#125277](https://github.com/kubernetes/kubernetes/pull/125277).
 - **2024-08-28:** Updates to KEP, GA requirements and intention to release in version 1.32.
+- **2024-10-15:** Updates to KEPs to reflect eviction and extensions.
 
 ## Drawbacks
 
